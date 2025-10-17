@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import formidable from "formidable";
 import fs from "fs";
-import { put } from "@vercel/blob";
+import { put, del } from "@vercel/blob";
 
 const app = express();
 app.use(cors());
@@ -42,14 +42,19 @@ app.post("/api/upload", async (req, res) => {
     }
   });
 });
+// 🔹 Eliminación de imágenes de Vercel Blob
 app.delete("/api/delete", async (req, res) => {
   try {
     const { url } = req.body;
-    await del(url); // Elimina el blob remoto
+    if (!url)
+      return res.status(400).json({ error: "Falta la URL del archivo" });
+
+    await del(url); // 🧹 Elimina el archivo remoto
+    console.log("🗑️ Archivo eliminado de Blob:", url);
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: "Error al eliminar el archivo" });
+    console.error("❌ Error al eliminar archivo:", error);
+    res.status(500).json({ error: "Error al eliminar archivo" });
   }
 });
-
 app.listen(3000, () => console.log("✅ Servidor corriendo en puerto 3000"));
