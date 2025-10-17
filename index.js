@@ -42,5 +42,14 @@ app.post("/api/upload", async (req, res) => {
     }
   });
 });
+app.delete("/api/delete", async (req, res) => {
+  try {
+    const { url } = req.body;
+    await del(url); // Elimina el blob remoto
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Error al eliminar el archivo" });
+  }
+});
 
 app.listen(3000, () => console.log("✅ Servidor corriendo en puerto 3000"));
