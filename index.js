@@ -33,21 +33,18 @@ app.post("/api/upload", async (req, res) => {
         return res.status(500).json({ error: "Error al procesar archivo" });
       }
 
-      const file = files.file?.[0];
+      const file = Array.isArray(files.file) ? files.file[0] : files.file;
       if (!file) {
         return res.status(400).json({ error: "No se envió archivo" });
       }
 
-      // 🧠 Leer el archivo como buffer (sin usar createReadStream)
       const buffer = await fs.promises.readFile(file.filepath);
-
-      // 🚀 Subir a Blob Storage
       const blob = await put(file.originalFilename, buffer, {
-        access: "public", // hace la URL pública
+        access: "public",
       });
 
       console.log("✅ Archivo subido a:", blob.url);
-      res.json({ success: true, url: blob.url });
+      res.json({ success: true, url: blob.url }); // <-- El frontend lee esto
     });
   } catch (error) {
     console.error("❌ Error general al subir archivo:", error);
