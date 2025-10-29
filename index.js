@@ -26,35 +26,36 @@ app.get("/", (req, res) => {
   res.json({ message: "✅ Backend funcionando" });
 });
 
-// ✅ SUBIDA DE IMÁGENES
+// ✅ SUBIDA DE MÚLTIPLES IMÁGENES
 app.post("/api/upload", (req, res) => {
-  const form = formidable({ multiples: false });
+  const form = formidable({ multiples: true }); // ← permite varios archivos
 
   form.parse(req, async (err, fields, files) => {
     if (err) {
-      console.error("❌ Error al procesar archivo:", err);
-      return res.status(500).json({ error: "Error al procesar archivo" });
+      console.error("❌ Error al procesar archivos:", err);
+      return res.status(500).json({ error: "Error al procesar archivos" });
     }
 
     try {
-      // ✅ Manejo robusto de archivo
-      const file = Array.isArray(files.file) ? files.file[0] : files.file;
-      if (!file) {
-        console.error("⚠️ No se recibió archivo");
-        return res.status(400).json({ error: "No se envió archivo" });
+      // 🔹 Asegurar que 'files.file' siempre sea un array
+      const fileList = Array.isArray(files.file) ? files.file : [files.file];
+      const urls = [];
+
+      // 🔹 Subir cada archivo a Vercel Blob
+      for (const file of fileList) {
+        const buffer = await fs.promises.readFile(file.filepath);
+        const blob = await put(file.originalFilename, buffer, {
+          access: "public",
+        });
+        urls.push(blob.url);
+        console.log("✅ Subido:", blob.url);
       }
 
-      // ✅ Leer archivo y subir a Blob
-      const buffer = await fs.promises.readFile(file.filepath);
-      const blob = await put(file.originalFilename, buffer, {
-        access: "public",
-      });
-
-      console.log("✅ Archivo subido a:", blob.url);
-      return res.status(200).json({ success: true, url: blob.url });
+      // 🔹 Devuelve todas las URLs al frontend
+      res.status(200).json({ success: true, urls });
     } catch (error) {
-      console.error("❌ Error al subir a Blob:", error);
-      return res.status(500).json({ error: "Error al subir imagen" });
+      console.error("❌ Error al subir imágenes:", error);
+      res.status(500).json({ error: "Error al subir imágenes" });
     }
   });
 });
