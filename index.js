@@ -1,3 +1,4 @@
+// server.js  (o index.js)
 import express from "express";
 import cors from "cors";
 import formidable from "formidable";
@@ -6,13 +7,13 @@ import { put, del } from "@vercel/blob";
 
 const app = express();
 
-// ✅ CORS
 app.use(
   cors({
     origin: [
       "https://nkjconstructionllc.com",
       "http://localhost:5173",
       "https://j6ltjs-5173.csb.app",
+      "https://76njlz-5173.csb.app",
       "https://76njlz-5173.csb.app",
     ],
     methods: ["GET", "POST", "DELETE"],
@@ -22,52 +23,50 @@ app.use(
 
 app.use(express.json());
 
-// 🚀 Test
-app.get("/", (req, res) => res.json({ message: "✅ Backend funcionando" }));
+app.get("/", (_req, res) => res.json({ message: "✅ Backend funcionando" }));
 
-// ✅ MULTIPLE IMAGE UPLOAD
+// ✅ SUBIR UNA IMAGEN POR PETICIÓN (compatible con tu base)
 app.post("/api/upload", (req, res) => {
-  const form = formidable({ multiples: true });
+  // multiples:false = UNA imagen por request (así funcionaba tu base)
+  const form = formidable({ multiples: false, keepExtensions: true });
 
-  form.parse(req, async (err, fields, files) => {
-    if (err) return res.status(500).json({ error: "Error procesando archivo" });
-
+  form.parse(req, async (err, _fields, files) => {
+    if (err) {
+      console.error("❌ Error al procesar archivo:", err);
+      return res.status(500).json({ error: "Error al procesar archivo" });
+    }
     try {
-      const uploadedUrls = [];
+      const file = Array.isArray(files.file) ? files.file[0] : files.file;
+      if (!file) return res.status(400).json({ error: "No se envió archivo" });
 
-      // Asegurar que `files.file` sea un array
-      const fileList = Array.isArray(files.file) ? files.file : [files.file];
+      const buffer = await fs.promises.readFile(file.filepath);
+      const blob = await put(file.originalFilename, buffer, {
+        access: "public",
+      });
 
-      for (const file of fileList) {
-        const buffer = await fs.promises.readFile(file.filepath);
-        const blob = await put(file.originalFilename, buffer, {
-          access: "public",
-        });
-        uploadedUrls.push(blob.url);
-      }
-
-      console.log("✅ Imágenes subidas:", uploadedUrls.length);
-      return res.status(200).json({ success: true, urls: uploadedUrls });
+      // 👇 contrato idéntico al que ya usabas en el frontend base
+      return res.status(200).json({ success: true, url: blob.url });
     } catch (error) {
-      console.error("❌ Error al subir imágenes:", error);
-      return res.status(500).json({ error: "Error al subir imágenes" });
+      console.error("❌ Error al subir a Blob:", error);
+      return res.status(500).json({ error: "Error al subir imagen" });
     }
   });
 });
 
-// 🗑️ DELETE IMAGE
+// 🗑️ ELIMINAR UNA IMAGEN
 app.delete("/api/delete", async (req, res) => {
   try {
     const { url } = req.body;
-    if (!url) return res.status(400).json({ error: "Falta la URL" });
+    if (!url)
+      return res.status(400).json({ error: "Falta la URL del archivo" });
 
     await del(url);
-    console.log("🗑️ Imagen eliminada:", url);
     res.json({ success: true });
   } catch (error) {
-    console.error("❌ Error al eliminar imagen:", error);
-    res.status(500).json({ error: "Error al eliminar imagen" });
+    console.error("❌ Error al eliminar archivo:", error);
+    res.status(500).json({ error: "Error al eliminar archivo" });
   }
 });
 
-app.listen(3000, () => console.log("✅ Servidor en puerto 3000"));
+// Puerto local (ignorado en Vercel)
+app.listen(3000, () => console.log("✅ Servidor corriendo en puerto 3000"));
