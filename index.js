@@ -1,4 +1,3 @@
-// server.js  (o index.js)
 import express from "express";
 import cors from "cors";
 import formidable from "formidable";
@@ -7,14 +6,13 @@ import { put, del } from "@vercel/blob";
 
 const app = express();
 
+// ✅ CORS — acepta CodeSandbox, localhost y dominio oficial
 app.use(
   cors({
     origin: [
-      "https://nkjconstructionllc.com",
       "http://localhost:5173",
-      "https://j6ltjs-5173.csb.app",
-      "https://76njlz-5173.csb.app",
-      "https://76njlz-5173.csb.app",
+      "https://nkjconstructionllc.com",
+      /\.csb\.app$/, // ✅ para CodeSandbox
     ],
     methods: ["GET", "POST", "DELETE"],
     allowedHeaders: ["Content-Type"],
@@ -23,43 +21,54 @@ app.use(
 
 app.use(express.json());
 
-app.get("/", (_req, res) => res.json({ message: "✅ Backend funcionando" }));
-
-// ✅ SUBIR UNA IMAGEN POR PETICIÓN (compatible con tu base)
+// ✅ Subida de múltiples imágenes por petición
 app.post("/api/upload", (req, res) => {
-  // multiples:false = UNA imagen por request (así funcionaba tu base)
-  const form = formidable({ multiples: false, keepExtensions: true });
+  const form = formidable({ multiples: true, keepExtensions: true });
 
   form.parse(req, async (err, _fields, files) => {
     if (err) {
       console.error("❌ Error al procesar archivo:", err);
       return res.status(500).json({ error: "Error al procesar archivo" });
     }
+
     try {
-      const file = Array.isArray(files.file) ? files.file[0] : files.file;
-      if (!file) return res.status(400).json({ error: "No se envió archivo" });
+      const fileArray = Array.isArray(files.file)
+        ? files.file
+        : [files.file].filter(Boolean);
 
-      const buffer = await fs.promises.readFile(file.filepath);
-      const blob = await put(file.originalFilename, buffer, {
-        access: "public",
-      });
+      if (!fileArray.length)
+        return res.status(400).json({ error: "No se envió archivo" });
 
-      // 👇 contrato idéntico al que ya usabas en el frontend base
-      return res.status(200).json({ success: true, url: blob.url });
+      const urls = [];
+      const MAX_MB = 4;
+
+      for (const file of fileArray) {
+        if (file.size > MAX_MB * 1024 * 1024) {
+          console.warn(`⚠️ Archivo demasiado grande: ${file.originalFilename}`);
+          continue; // ignora ese archivo
+        }
+
+        const stream = fs.createReadStream(file.filepath);
+        const blob = await put(file.originalFilename, stream, {
+          access: "public",
+        });
+        urls.push(blob.url);
+      }
+
+      console.log("✅ Imágenes subidas:", urls);
+      res.status(200).json({ success: true, urls });
     } catch (error) {
-      console.error("❌ Error al subir a Blob:", error);
-      return res.status(500).json({ error: "Error al subir imagen" });
+      console.error("❌ Error al subir imágenes:", error);
+      res.status(500).json({ error: "Error al subir imágenes" });
     }
   });
 });
 
-// 🗑️ ELIMINAR UNA IMAGEN
+// 🗑️ Eliminar imagen del blob
 app.delete("/api/delete", async (req, res) => {
   try {
     const { url } = req.body;
-    if (!url)
-      return res.status(400).json({ error: "Falta la URL del archivo" });
-
+    if (!url) return res.status(400).json({ error: "Falta la URL" });
     await del(url);
     res.json({ success: true });
   } catch (error) {
@@ -68,5 +77,7 @@ app.delete("/api/delete", async (req, res) => {
   }
 });
 
-// Puerto local (ignorado en Vercel)
-app.listen(3000, () => console.log("✅ Servidor corriendo en puerto 3000"));
+// 🔍 Prueba rápida
+app.get("/", (_req, res) => res.json({ message: "✅ Backend operativo" }));
+
+app.listen(3000, () => console.log("Servidor corriendo en puerto 3000"));
